@@ -9,22 +9,14 @@ import { lazy } from 'react'
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const projects = [
-  {
-    slug: 'reaction-game',
-    title: 'Reaction Time',
-    description: 'Test your reflexes. Wait for green, then tap as fast as you can.',
-    emoji: '⚡',
-    tag: 'Game',
-    accent: '#f59e0b',
-    component: lazy(() => import('./reaction-game/index.jsx')),
-  },
-  {
-    slug: 'personality-quiz',
-    title: 'Which Snack Are You?',
-    description: 'A totally scientific 5-question quiz to reveal your true snack identity.',
-    emoji: '🍪',
-    tag: 'Quiz',
-    accent: '#ec4899',
-    component: lazy(() => import('./personality-quiz/index.jsx')),
-  },
+  // Your projects go here. Example shape:
+  // {
+  //   slug: 'tic-tac-toe',
+  //   title: 'Tic-Tac-Toe',
+  //   description: 'Classic 3-in-a-row against a friend.',
+  //   emoji: '⭕',
+  //   tag: 'Game',
+  //   accent: '#6366f1',
+  //   component: lazy(() => import('./tic-tac-toe/index.jsx')),
+  // },
 ]

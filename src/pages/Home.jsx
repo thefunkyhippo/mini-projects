@@ -9,8 +9,13 @@ export default function Home() {
         <p>A growing collection of little games, quizzes, and experiments.</p>
       </section>
 
-      <section className="grid">
-        {projects.map((p) => (
+      {projects.length === 0 ? (
+        <div className="empty-state">
+          <p>No projects yet — your first one will show up here.</p>
+        </div>
+      ) : (
+        <section className="grid">
+          {projects.map((p) => (
           <Link
             key={p.slug}
             to={`/${p.slug}`}
@@ -28,9 +33,10 @@ export default function Home() {
             <span className="card-arrow" aria-hidden="true">
               →
             </span>
-          </Link>
-        ))}
-      </section>
+            </Link>
+          ))}
+        </section>
+      )}
     </div>
   )
 }
