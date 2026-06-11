@@ -1,20 +1,24 @@
 import { useState } from 'react'
 
 const POSITIONS = [
-  'Lotus', 'Cowgirl', 'Missionary', 'Doggy Style', 'Spooning',
-  'Reverse Cowgirl', 'Standing', 'The Bridge', 'The Eagle', 'The Lap Dance',
-  'The Lotus Blossom', 'The Butterfly', 'The Pretzel', 'The Splitting Bamboo',
-  'The Wheelbarrow', 'The Crouching Tiger', 'Suspended Congress', 'The Peg',
-  'The Yawning', 'The Plough', 'The Clasping', 'The Twining', 'The Rising',
-  'The Pressing', 'The Half-Pressed', 'The Mare', 'The Crab', 'The Packed',
-  'The Lotus-Like', 'The Turning', 'The Swing', 'The Tripod', 'The Elephant',
-  'The Tigress', 'The Deer', 'The Bull', 'The Hare', 'The Cat', 'The Serpent',
-  'The Snake Trap', 'The Boat', 'The Cradle', 'The Throne', 'The Anvil',
-  'The Hammock', 'The Ladle', 'The Spider', 'The Scissors', 'The Drawbridge',
-  'The Lazy Man', 'The Catherine Wheel', 'The Frog', 'The Coital Alignment',
-  'The Reclining Lotus', 'The Backbend', 'The Glowing Triangle', 'The Magic Mountain',
-  'The Counter Balance', 'The Rocking Horse', 'The Stand and Carry', 'The Galley',
-  'The Amazon', 'The Curled Angel', 'The Padlock',
+  // Modern main positions
+  'Missionary', 'Cowgirl', 'Reverse Cowgirl', 'Doggy Style', 'Spooning',
+  'The Lotus', 'Standing', 'The Bridge', 'Spread Eagle', 'The Wheelbarrow',
+  'The Butterfly', 'The Scissors', 'The Pile Driver', 'The Cradle',
+  'The Anvil', 'The Amazon', 'The Deck Chair', 'The Padlock',
+  // The Joy of Sex
+  'The X Position', 'The Croupade', 'The Cuissade', 'The Flanquette',
+  'The Viennese Oyster', 'The Magic Mountain',
+  // Pop culture
+  'The 69', 'The Rocking Horse', 'The Stand and Carry', 'The Glowing Triangle',
+  // Kama Sutra positions
+  'Suspended Congress', 'The Yawning Position', 'The Widely Opened Position',
+  'The Position of Indrani', 'Splitting of a Bamboo', 'Fixing of a Nail',
+  'The Crab', 'The Pressing Position', 'The Half-Pressed Position',
+  'The Clasping Position', 'The Rising Position', 'The Lotus-Like Position',
+  // Original embraces (lying)
+  'Twining of a Creeper', 'Climbing a Tree', 'Milk and Water Embrace',
+  'Mixture of Sesame and Rice',
 ]
 
 export default function Spinner() {
