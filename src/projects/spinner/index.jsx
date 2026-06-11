@@ -5,7 +5,16 @@ const POSITIONS = [
   'Reverse Cowgirl', 'Standing', 'The Bridge', 'The Eagle', 'The Lap Dance',
   'The Lotus Blossom', 'The Butterfly', 'The Pretzel', 'The Splitting Bamboo',
   'The Wheelbarrow', 'The Crouching Tiger', 'Suspended Congress', 'The Peg',
-  'The Yawning', 'The Plough',
+  'The Yawning', 'The Plough', 'The Clasping', 'The Twining', 'The Rising',
+  'The Pressing', 'The Half-Pressed', 'The Mare', 'The Crab', 'The Packed',
+  'The Lotus-Like', 'The Turning', 'The Swing', 'The Tripod', 'The Elephant',
+  'The Tigress', 'The Deer', 'The Bull', 'The Hare', 'The Cat', 'The Serpent',
+  'The Snake Trap', 'The Boat', 'The Cradle', 'The Throne', 'The Anvil',
+  'The Hammock', 'The Ladle', 'The Spider', 'The Scissors', 'The Drawbridge',
+  'The Lazy Man', 'The Catherine Wheel', 'The Frog', 'The Coital Alignment',
+  'The Reclining Lotus', 'The Backbend', 'The Glowing Triangle', 'The Magic Mountain',
+  'The Counter Balance', 'The Rocking Horse', 'The Stand and Carry', 'The Galley',
+  'The Amazon', 'The Curled Angel', 'The Padlock',
 ]
 
 export default function Spinner() {
