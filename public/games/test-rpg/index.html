@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>test rpg</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="stage">
+    <header class="hud">
+      <h1>test rpg</h1>
+      <div class="counters">
+        <span class="counter" title="coins">◉ <b id="coins">0</b></span>
+        <span class="counter" title="potions">⚗ <b id="potions">0</b></span>
+        <span class="counter" title="equipped spell">✦ <b id="spell">Arcane Bolt</b></span>
+      </div>
+    </header>
+
+    <div class="frame">
+      <canvas id="game"></canvas>
+    </div>
+
+    <footer class="help">
+      Move <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>/arrows · <kbd>Space</kbd> sword · <kbd>F</kbd> cast spell ·
+      potions heal · crystals = mana · tomes = max mana · scrolls swap your spell
+    </footer>
+  </main>
+
+  <script src="src/sprites.js"></script>
+  <script src="src/game.js"></script>
+</body>
+</html>

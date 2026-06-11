@@ -9,14 +9,13 @@ import { lazy } from 'react'
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const projects = [
-  // Your projects go here. Example shape:
-  // {
-  //   slug: 'tic-tac-toe',
-  //   title: 'Tic-Tac-Toe',
-  //   description: 'Classic 3-in-a-row against a friend.',
-  //   emoji: '⭕',
-  //   tag: 'Game',
-  //   accent: '#6366f1',
-  //   component: lazy(() => import('./tic-tac-toe/index.jsx')),
-  // },
+  {
+    slug: 'test-rpg',
+    title: 'Test RPG',
+    description: 'A dark-fantasy top-down RPG with 16-bit pixel art and Pokémon-style grid movement.',
+    emoji: '🗡️',
+    tag: 'Game',
+    accent: '#7b46a0',
+    component: lazy(() => import('./test-rpg/index.jsx')),
+  },
 ]
