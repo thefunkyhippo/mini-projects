@@ -35,7 +35,7 @@ export default function Layout({ children }) {
           userSelect: 'none',
         }}
       >
-        ·
+        Hush
       </Link>
     </div>
   )
