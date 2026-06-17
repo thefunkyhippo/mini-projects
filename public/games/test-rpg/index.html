@@ -13,21 +13,25 @@
       <div class="counters">
         <span class="counter" title="coins">◉ <b id="coins">0</b></span>
         <span class="counter" title="potions">⚗ <b id="potions">0</b></span>
-        <span class="counter" title="equipped spell">✦ <b id="spell">Arcane Bolt</b></span>
+        <span class="counter" title="melee weapon — Z to swap">⚔ <b id="melee">Sword</b></span>
+        <span class="counter" title="ranged weapon — X to swap">➹ <b id="ranged">Staff</b></span>
       </div>
     </header>
 
     <div class="frame">
       <canvas id="game"></canvas>
+      <div id="textbox"></div>
+      <div id="inventory"></div>
     </div>
 
     <footer class="help">
-      Move <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>/arrows · <kbd>Space</kbd> sword · <kbd>F</kbd> cast spell ·
-      potions heal · crystals = mana · tomes = max mana · scrolls swap your spell
+      <kbd>WASD</kbd> move · <kbd>Space</kbd> melee · <kbd>F</kbd> ranged · <kbd>Z</kbd>/<kbd>X</kbd> swap weapons ·
+      <kbd>Q</kbd> potion · <kbd>I</kbd> inventory · raid chests for weapons & relics
     </footer>
   </main>
 
   <script src="src/sprites.js"></script>
+  <script src="src/kenney.js"></script>
   <script src="src/game.js"></script>
 </body>
 </html>
