@@ -17,7 +17,7 @@ export default function App() {
       <Suspense fallback={<Loading />}>
         <Routes>
           <Route path="/" element={<Home />} />
-          {projects.map((p) => {
+          {projects.filter((p) => p.component).map((p) => {
             const Component = p.component
             return <Route key={p.slug} path={`/${p.slug}`} element={<Component />} />
           })}

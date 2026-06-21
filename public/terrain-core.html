@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Terrain Core — GPX to 3D relief</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0f1719;
+    --panel:rgba(20,30,32,0.72);
+    --panel-solid:#141e20;
+    --line:rgba(255,255,255,0.10);
+    --line-strong:rgba(255,255,255,0.18);
+    --ink:#e6edee;
+    --ink-dim:#8ea0a2;
+    --ink-faint:#5d6e70;
+    --cyan:#5fd0c8;
+    --cyan-dim:#3a8782;
+    --coral:#ff7a4d;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  .mono{font-family:"IBM Plex Mono",monospace;}
+  #stage{position:fixed;inset:0;}
+  canvas{display:block;touch-action:none;}
+
+  /* wordmark / status */
+  #brand{position:fixed;top:16px;left:18px;z-index:5;pointer-events:none;}
+  #brand h1{font-family:"IBM Plex Sans Condensed";font-weight:600;font-size:15px;
+    letter-spacing:.22em;text-transform:uppercase;margin:0;color:var(--ink);}
+  #brand .sub{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-faint);margin-top:3px;}
+  #status{margin-top:10px;font-size:11px;color:var(--ink-dim);pointer-events:none;}
+  #status .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ink-faint);
+    margin-right:6px;vertical-align:middle;}
+  #status.real .dot{background:var(--cyan);box-shadow:0 0 8px var(--cyan);}
+  #status.synth .dot{background:var(--coral);}
+
+  /* altitude scale — signature element */
+  #scale{position:fixed;left:18px;top:50%;transform:translateY(-50%);z-index:6;
+    width:30px;height:min(56vh,420px);}
+  #scaleBar{position:absolute;inset:0;border-radius:6px;border:1px solid var(--line-strong);
+    overflow:hidden;cursor:ns-resize;}
+  #scaleGrad{position:absolute;inset:0;}
+  #snowHandle{position:absolute;left:-5px;right:-5px;height:2px;background:#fff;
+    box-shadow:0 0 0 1px rgba(0,0,0,.5),0 0 10px rgba(255,255,255,.6);cursor:ns-resize;}
+  #snowHandle::after{content:"";position:absolute;right:-7px;top:-4px;width:0;height:0;
+    border-top:5px solid transparent;border-bottom:5px solid transparent;border-right:7px solid #fff;}
+  #scaleTicks{position:absolute;left:38px;top:0;bottom:0;width:60px;}
+  #scaleTicks span{position:absolute;font-size:10px;color:var(--ink-faint);transform:translateY(-50%);white-space:nowrap;}
+  #scaleCap{position:absolute;left:0;top:-20px;font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--ink-faint);}
+
+  /* control panel */
+  #panel{position:fixed;top:0;right:0;height:100%;width:336px;z-index:8;
+    background:var(--panel);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+    border-left:1px solid var(--line);display:flex;flex-direction:column;}
+  #panelHead{padding:18px 20px 12px;border-bottom:1px solid var(--line);flex:0 0 auto;}
+  #panelHead .k{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-faint);}
+  #stats{margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;}
+  #stats div{font-size:12px;color:var(--ink-dim);}
+  #stats b{display:block;font-family:"IBM Plex Mono";font-weight:500;font-size:14px;color:var(--ink);}
+  #scroll{overflow-y:auto;padding:6px 20px 28px;flex:1 1 auto;scrollbar-width:thin;
+    -webkit-overflow-scrolling:touch;overscroll-behavior:contain;}
+  #scroll::-webkit-scrollbar{width:8px;}
+  #scroll::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:8px;}
+
+  details{border-bottom:1px solid var(--line);}
+  summary{list-style:none;cursor:pointer;padding:14px 2px;display:flex;align-items:center;
+    justify-content:space-between;font-family:"IBM Plex Sans Condensed";font-weight:600;
+    font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink);}
+  summary::-webkit-details-marker{display:none;}
+  summary .chev{color:var(--ink-faint);transition:transform .2s ease;font-size:11px;}
+  details[open] summary .chev{transform:rotate(90deg);}
+  .body{padding:2px 2px 16px;}
+
+  .row{margin:13px 0;}
+  .row label{display:flex;justify-content:space-between;align-items:baseline;
+    font-size:12px;color:var(--ink-dim);margin-bottom:7px;}
+  .row label .val{font-family:"IBM Plex Mono";color:var(--ink);font-size:12px;}
+
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:3px;border-radius:3px;
+    background:var(--line-strong);outline:none;}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;
+    background:var(--cyan);border:2px solid var(--panel-solid);cursor:pointer;
+    box-shadow:0 0 0 1px var(--cyan-dim);transition:transform .12s ease;}
+  input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.18);}
+  input[type=range]::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:var(--cyan);
+    border:2px solid var(--panel-solid);cursor:pointer;}
+
+  .seg{display:flex;gap:6px;}
+  .seg button{flex:1;padding:9px 0;font:inherit;font-size:12px;color:var(--ink-dim);
+    background:transparent;border:1px solid var(--line-strong);border-radius:8px;cursor:pointer;
+    transition:all .15s ease;}
+  .seg button:hover{color:var(--ink);border-color:var(--ink-faint);}
+  .seg button.on{background:var(--cyan);color:#08110f;border-color:var(--cyan);font-weight:600;}
+
+  .toggle{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ink-dim);margin:13px 0;}
+  .sw{position:relative;width:38px;height:21px;border-radius:21px;background:var(--line-strong);
+    cursor:pointer;transition:background .18s ease;flex:0 0 auto;}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;
+    background:var(--ink-dim);transition:all .18s ease;}
+  .sw.on{background:var(--cyan-dim);}
+  .sw.on::after{left:19px;background:var(--cyan);}
+
+  .action{display:block;width:100%;padding:11px;font:inherit;font-size:13px;font-weight:600;
+    border-radius:9px;cursor:pointer;border:1px solid var(--line-strong);background:transparent;
+    color:var(--ink);text-align:center;box-sizing:border-box;transition:all .15s ease;}
+  .action:hover{border-color:var(--cyan-dim);color:var(--cyan);}
+  .action.primary{background:var(--cyan);color:#08110f;border-color:var(--cyan);}
+  .action.primary:hover{background:#7adfd7;color:#08110f;}
+  .ghost{background:transparent;border:1px dashed var(--line-strong);color:var(--ink-dim);}
+
+  input[type=color]{-webkit-appearance:none;appearance:none;width:34px;height:26px;padding:0;
+    border:1px solid var(--line-strong);border-radius:6px;background:none;cursor:pointer;flex:0 0 auto;}
+  input[type=color]::-webkit-color-swatch-wrapper{padding:2px;}
+  input[type=color]::-webkit-color-swatch{border:none;border-radius:4px;}
+
+  .stop{display:flex;align-items:center;gap:9px;margin:9px 0;}
+  .stop input[type=range]{flex:1;}
+  .stop .rm{flex:0 0 auto;width:22px;height:22px;border-radius:6px;border:1px solid var(--line-strong);
+    background:transparent;color:var(--ink-faint);cursor:pointer;font-size:13px;line-height:1;}
+  .stop .rm:hover{color:var(--coral);border-color:var(--coral);}
+
+  .hint{font-size:11px;color:var(--ink-faint);line-height:1.5;margin-top:4px;}
+
+  #panelToggle{display:none;}
+
+  @media (max-width:780px){
+    #scale{left:12px;width:16px;height:min(42vh,300px);}
+    #scaleCap,#scaleTicks{display:none;}
+    #panel{top:auto;bottom:0;left:0;width:100%;height:auto;max-height:74vh;
+      border-left:none;border-top:1px solid var(--line);border-radius:18px 18px 0 0;
+      transform:translateY(calc(100% - 54px));transition:transform .3s cubic-bezier(.4,0,.2,1);}
+    #panel.open{transform:translateY(0);box-shadow:0 -14px 44px rgba(0,0,0,.5);}
+    #panelToggle{display:block;width:100%;padding:16px 20px 14px;text-align:center;
+      font-family:"IBM Plex Sans Condensed";font-weight:600;letter-spacing:.16em;
+      text-transform:uppercase;font-size:12px;color:var(--ink);background:none;border:none;cursor:pointer;}
+    #panelToggle .grip{display:block;width:42px;height:4px;border-radius:4px;background:var(--line-strong);
+      margin:0 auto 12px;transition:background .2s ease;}
+    #panel.open #panelToggle .grip{background:var(--cyan);}
+    #brand{top:12px;left:12px;}
+    #brand h1{font-size:13px;}
+    #scroll{padding-bottom:40px;}
+  }
+  @media (max-width:780px) and (max-height:480px){   /* landscape phones */
+    #scale{height:min(64vh,220px);}
+    #panel{max-height:88vh;}
+  }
+  @media (pointer:coarse){                            /* roomier touch targets */
+    input[type=range]{height:5px;}
+    input[type=range]::-webkit-slider-thumb{width:22px;height:22px;}
+    input[type=range]::-moz-range-thumb{width:20px;height:20px;}
+    summary{padding:17px 2px;}
+    .sw{width:44px;height:25px;}
+    .sw::after{width:21px;height:21px;}
+    .sw.on::after{left:21px;}
+    input[type=color]{width:42px;height:30px;}
+    .stop .rm{width:28px;height:28px;}
+    .seg button{padding:12px 0;}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+  <div id="stage"></div>
+
+  <div id="brand">
+    <h1>Terrain Core</h1>
+    <div class="sub">GPX · relief study</div>
+    <div id="status"><span class="dot"></span><span id="statusText">Initialising</span></div>
+  </div>
+
+  <div id="scale">
+    <div id="scaleCap">Altitude</div>
+    <div id="scaleBar"><div id="scaleGrad"></div><div id="snowHandle"></div></div>
+    <div id="scaleTicks"></div>
+  </div>
+
+  <aside id="panel">
+    <button id="panelToggle"><span class="grip"></span>Controls</button>
+    <div id="panelHead">
+      <div class="k">Current model</div>
+      <div id="stats">
+        <div>Distance<b id="stDist">—</b></div>
+        <div>Elev. gain<b id="stGain">—</b></div>
+        <div>Low / high<b id="stRange">—</b></div>
+        <div>Core radius<b id="stRadius">—</b></div>
+      </div>
+    </div>
+    <div id="scroll">
+
+      <details open>
+        <summary>Source <span class="chev">›</span></summary>
+        <div class="body">
+          <div class="row">
+            <label class="action primary" id="uploadBtn" for="gpxFile">Upload a .GPX file</label>
+            <input type="file" id="gpxFile" accept=".gpx,.xml,application/gpx+xml,application/xml,text/xml" hidden>
+          </div>
+          <div class="row"><button class="action ghost" id="demoBtn">Load a demo hike</button></div>
+          <div class="hint" id="srcHint">A GPX gives only your trail. The surrounding land is pulled from a free global elevation dataset (no key needed) and decoded in your browser.</div>
+        </div>
+      </details>
+
+      <details open>
+        <summary>Model <span class="chev">›</span></summary>
+        <div class="body">
+          <div class="row">
+            <label>Style</label>
+            <div class="seg" id="styleSeg">
+              <button data-style="realistic" class="on">Realistic</button>
+              <button data-style="contour">Contour</button>
+              <button data-style="lowpoly">Low poly</button>
+              <button data-style="voxel">Voxel</button>
+            </div>
+          </div>
+          <div class="toggle">Smooth shading <div class="sw on" id="smoothSw"></div></div>
+          <div class="row"><label>Detail <span class="val" id="detailVal">4</span></label>
+            <input type="range" id="detail" min="1" max="5" step="1" value="4"></div>
+          <div class="row"><label>Vertical exaggeration <span class="val" id="exagVal">1.8×</span></label>
+            <input type="range" id="exag" min="0.5" max="5" step="0.1" value="1.8"></div>
+          <div class="row"><label>Surroundings <span class="val" id="padVal">150%</span></label>
+            <input type="range" id="pad" min="110" max="320" step="5" value="150"></div>
+          <div class="row"><label>Pedestal depth <span class="val" id="pedVal">12%</span></label>
+            <input type="range" id="ped" min="0" max="35" step="1" value="12"></div>
+        </div>
+      </details>
+
+      <details open>
+        <summary>Colour <span class="chev">›</span></summary>
+        <div class="body">
+          <div class="hint">Land colour follows altitude. Drag the stops to reshape the ramp; it mirrors live on the altitude scale.</div>
+          <div id="stops"></div>
+          <div class="row"><button class="action ghost" id="addStop">+ Add colour stop</button></div>
+          <div class="row"><label>Slope shading <span class="val" id="slopeVal">35%</span></label>
+            <input type="range" id="slope" min="0" max="100" step="1" value="35"></div>
+          <div class="row"><label>Contour lines <span class="val" id="contourVal">24</span></label>
+            <input type="range" id="contour" min="5" max="60" step="1" value="24"></div>
+          <div class="toggle">Strata / base colour
+            <input type="color" id="baseColor" value="#4a4540"></div>
+          <div class="toggle">Background
+            <input type="color" id="bgColor" value="#0f1719"></div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Snow <span class="chev">›</span></summary>
+        <div class="body">
+          <div class="row"><label>Snow line <span class="val mono" id="snowVal">—</span></label>
+            <input type="range" id="snow" min="0" max="100" step="1" value="72"></div>
+          <div class="row"><label>Coverage <span class="val" id="snowBlendVal">85%</span></label>
+            <input type="range" id="snowBlend" min="0" max="100" step="1" value="85"></div>
+          <div class="row"><label>Clings to slopes up to <span class="val" id="snowSlopeVal">55%</span></label>
+            <input type="range" id="snowSlope" min="0" max="100" step="1" value="55"></div>
+          <div class="hint">Steep faces shed snow and stay rock, like the real thing.</div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Trail <span class="chev">›</span></summary>
+        <div class="body">
+          <div class="toggle">Show trail <div class="sw on" id="trailSw"></div></div>
+          <div class="toggle">Start &amp; end markers <div class="sw on" id="markerSw"></div></div>
+          <div class="toggle">Trail colour <input type="color" id="trailColor" value="#ff7a4d"></div>
+          <div class="row"><label>Thickness <span class="val" id="trailWVal">4</span></label>
+            <input type="range" id="trailW" min="1" max="12" step="1" value="4"></div>
+        </div>
+      </details>
+
+      <details>
+        <summary>Light <span class="chev">›</span></summary>
+        <div class="body">
+          <div class="row"><label>Sun direction <span class="val" id="azVal">135°</span></label>
+            <input type="range" id="az" min="0" max="360" step="1" value="135"></div>
+          <div class="row"><label>Sun height <span class="val" id="elVal">45°</span></label>
+            <input type="range" id="el" min="5" max="85" step="1" value="45"></div>
+          <div class="row"><label>Sun intensity <span class="val" id="intVal">110%</span></label>
+            <input type="range" id="int" min="0" max="220" step="1" value="110"></div>
+          <div class="row"><label>Ambient fill <span class="val" id="ambVal">35%</span></label>
+            <input type="range" id="amb" min="0" max="100" step="1" value="35"></div>
+        </div>
+      </details>
+
+      <details>
+        <summary>View &amp; export <span class="chev">›</span></summary>
+        <div class="body">
+          <div class="toggle">Auto-rotate <div class="sw on" id="rotSw"></div></div>
+          <div class="row"><label>Rotate speed <span class="val" id="rotVal">30%</span></label>
+            <input type="range" id="rot" min="0" max="100" step="1" value="30"></div>
+          <div class="row"><button class="action" id="resetCam">Reset camera</button></div>
+          <div class="row"><button class="action" id="savePng">Download PNG</button></div>
+          <div class="hint">A full poster export (high-res, margins, title block) is the next milestone after voxel.</div>
+        </div>
+      </details>
+
+    </div>
+  </aside>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+/* ============================================================
+   Terrain Core — GPX → circular 3D relief
+   Single file, no backend, no API keys.
+   Elevation: AWS public Terrarium tiles (CORS, decoded in-browser).
+   Falls back to synthetic terrain when offline (e.g. sandbox preview).
+============================================================ */
+
+// ---------- small math helpers ----------
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const lerp=(a,b,t)=>a+(b-a)*t;
+const smoothstep=(e0,e1,x)=>{const t=clamp((x-e0)/(e1-e0),0,1);return t*t*(3-2*t);};
+function hexToRgb(h){h=h.replace('#','');return{r:parseInt(h.slice(0,2),16)/255,g:parseInt(h.slice(2,4),16)/255,b:parseInt(h.slice(4,6),16)/255};}
+function haversine(a,b){const R=6371000,dLat=(b.lat-a.lat)*Math.PI/180,dLon=(b.lon-a.lon)*Math.PI/180,
+  la=a.lat*Math.PI/180,lb=b.lat*Math.PI/180;
+  const x=Math.sin(dLat/2)**2+Math.sin(dLon/2)**2*Math.cos(la)*Math.cos(lb);
+  return 2*R*Math.asin(Math.sqrt(x));}
+
+// ---------- global state ----------
+const S={
+  track:[],                 // [{lat,lon,ele}]
+  center:{lat:0,lon:0},
+  metersPerLon:111320, metersPerLat:111320,
+  sampleElev:null,          // fn(lat,lon)->metres
+  terrainSource:'none',
+  R:1000, trackMaxD:0,                   // core radius (m)
+  minElev:0, maxElev:1, elevSpan:1,
+  model:null,               // geometry bookkeeping
+  // controls
+  style:'realistic', smooth:true, detail:4, exag:1.8, pad:1.5, ped:0.12,
+  rampStops:[
+    {p:0.00,c:'#3f6d4e'},{p:0.30,c:'#6f8f4f'},{p:0.55,c:'#b39b5e'},
+    {p:0.75,c:'#8c6f52'},{p:0.92,c:'#6f6661'}
+  ],
+  slopeShade:0.35, baseColor:'#4a4540', bg:'#0f1719', contourCount:24,
+  snow:0.72, snowBlend:0.85, snowSlope:0.55,
+  trail:true, markers:true, trailColor:'#ff7a4d', trailW:4,
+  az:135, el:45, sunInt:1.1, amb:0.35,
+  autorotate:true, rotSpeed:0.30,
+};
+
+// ---------- device helpers ----------
+const isMobile=()=>matchMedia('(max-width:780px)').matches ||
+  (navigator.maxTouchPoints>1 && Math.min(innerWidth,innerHeight)<820);
+function defaultDetail(style){
+  const m=isMobile();
+  if(style==='lowpoly')return 2;
+  if(style==='voxel')return m?2:3;
+  if(style==='contour')return m?4:5;
+  return m?3:4;                       // realistic
+}
+
+// ---------- THREE setup ----------
+let renderer,scene,camera,sun,hemi,terrainMesh,trailGroup,clock;
+const cam={theta:0.9,phi:0.95,radius:2600,target:new THREE.Vector3(),
+  tTheta:0.9,tPhi:0.95,tRadius:2600};
+let dragging=false,lastP=null,pinchDist=0,interactT=0;
+
+function initThree(){
+  const stage=document.getElementById('stage');
+  renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio, isMobile()?1.5:2));
+  renderer.setSize(innerWidth,innerHeight);
+  stage.appendChild(renderer.domElement);
+
+  scene=new THREE.Scene();
+  scene.background=new THREE.Color(S.bg);
+  scene.fog=new THREE.FogExp2(S.bg,0.00006);
+
+  camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,1,200000);
+
+  hemi=new THREE.HemisphereLight(0xbfd6e6,0x2a221c,0.6);
+  scene.add(hemi);
+  sun=new THREE.DirectionalLight(0xfff2e0,1.1);
+  scene.add(sun);
+  scene.add(new THREE.AmbientLight(0xffffff,0.12));
+
+  trailGroup=new THREE.Group();
+  scene.add(trailGroup);
+
+  clock=new THREE.Clock();
+  bindCamera();
+  addEventListener('resize',onResize);
+  animate();
+}
+function onResize(){
+  camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+}
+
+// ---------- camera controls (lightweight orbit) ----------
+function bindCamera(){
+  const el=renderer.domElement;
+  const pts=new Map();
+  el.addEventListener('pointerdown',e=>{
+    pts.set(e.pointerId,e);
+    if(pts.size===1){dragging=true;lastP={x:e.clientX,y:e.clientY};
+      try{el.setPointerCapture(e.pointerId);}catch(_){}}
+    else{dragging=false;}                       // 2nd finger → pinch, not rotate
+    interactT=performance.now();
+  });
+  el.addEventListener('pointermove',e=>{
+    if(pts.has(e.pointerId))pts.set(e.pointerId,e);
+    if(pts.size>=2){                             // pinch zoom
+      const a=[...pts.values()];
+      const d=Math.hypot(a[0].clientX-a[1].clientX,a[0].clientY-a[1].clientY);
+      if(pinchDist)cam.tRadius=clamp(cam.tRadius*(pinchDist/d),S.R*0.45,S.R*6);
+      pinchDist=d;interactT=performance.now();return;
+    }
+    if(!dragging||!lastP)return;                 // single-pointer rotate
+    const dx=e.clientX-lastP.x,dy=e.clientY-lastP.y;lastP={x:e.clientX,y:e.clientY};
+    cam.tTheta+=dx*0.005;cam.tPhi=clamp(cam.tPhi-dy*0.005,0.18,1.48);
+    interactT=performance.now();
+  });
+  const clr=e=>{pts.delete(e.pointerId);if(pts.size<2)pinchDist=0;
+    if(pts.size===0){dragging=false;lastP=null;}};
+  el.addEventListener('pointerup',clr);el.addEventListener('pointercancel',clr);
+  el.addEventListener('wheel',e=>{e.preventDefault();
+    cam.tRadius=clamp(cam.tRadius*(1+Math.sign(e.deltaY)*0.08),S.R*0.45,S.R*6);
+    interactT=performance.now();},{passive:false});
+}
+function frameCamera(){
+  cam.tRadius=S.R*1.9;cam.tTheta=0.9;cam.tPhi=0.92;
+  const midY=S.elevSpan*S.exag*0.45;cam.target.set(0,midY,0);
+}
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=clock.getDelta();
+  const idle=performance.now()-interactT>1500;
+  if(S.autorotate&&!dragging&&idle)cam.tTheta-=dt*S.rotSpeed*0.6;
+  cam.theta=lerp(cam.theta,cam.tTheta,0.12);
+  cam.phi=lerp(cam.phi,cam.tPhi,0.12);
+  cam.radius=lerp(cam.radius,cam.tRadius,0.12);
+  const r=cam.radius,p=cam.phi,t=cam.theta;
+  camera.position.set(
+    cam.target.x+r*Math.sin(p)*Math.cos(t),
+    cam.target.y+r*Math.cos(p),
+    cam.target.z+r*Math.sin(p)*Math.sin(t));
+  camera.lookAt(cam.target);
+  renderer.render(scene,camera);
+}
+
+// ---------- GPX parsing ----------
+function parseGPX(text){
+  const xml=new DOMParser().parseFromString(text,'application/xml');
+  if(xml.querySelector('parsererror'))throw new Error('That file could not be read as GPX.');
+  let nodes=[...xml.getElementsByTagName('trkpt')];
+  if(!nodes.length)nodes=[...xml.getElementsByTagName('rtept')];
+  if(!nodes.length)nodes=[...xml.getElementsByTagName('wpt')];
+  const pts=[];
+  for(const n of nodes){
+    const lat=parseFloat(n.getAttribute('lat')),lon=parseFloat(n.getAttribute('lon'));
+    if(isNaN(lat)||isNaN(lon))continue;
+    const e=n.getElementsByTagName('ele')[0];
+    pts.push({lat,lon,ele:e?parseFloat(e.textContent):null});
+  }
+  if(pts.length<2)throw new Error('No usable track points found in that GPX.');
+  return pts;
+}
+
+// ---------- demo hike (near the Matterhorn) ----------
+function demoTrack(){
+  const c={lat:45.9763,lon:7.6586}, pts=[];
+  const N=160;
+  for(let i=0;i<N;i++){
+    const u=i/(N-1);
+    const ang=u*Math.PI*5.2;                       // switchback spiral
+    const rad=(1-u)*1100+90;                       // metres from peak
+    const wob=Math.sin(ang*1.7)*120;
+    const dx=Math.cos(ang)*(rad+wob), dz=Math.sin(ang)*rad;
+    const lat=c.lat+(-dz)/111320;
+    const lon=c.lon+dx/(111320*Math.cos(c.lat*Math.PI/180));
+    pts.push({lat,lon,ele:2050+u*1320+Math.sin(ang*2)*40});
+  }
+  return pts;
+}
+
+// ---------- synthetic terrain (offline fallback) ----------
+function makeSynth(){
+  const h=(x,y)=>{x=Math.sin(x*127.1+y*311.7)*43758.5453;return x-Math.floor(x);};
+  const vnoise=(x,y)=>{const xi=Math.floor(x),yi=Math.floor(y),xf=x-xi,yf=y-yi;
+    const u=xf*xf*(3-2*xf),v=yf*yf*(3-2*yf);
+    return lerp(lerp(h(xi,yi),h(xi+1,yi),u),lerp(h(xi,yi+1),h(xi+1,yi+1),u),v);};
+  const fbm=(x,y)=>{let a=0,amp=0.5,f=1;for(let o=0;o<5;o++){a+=vnoise(x*f,y*f)*amp;f*=2;amp*=0.5;}return a;};
+  return (lat,lon)=>{
+    const dx=(lon-S.center.lon)*S.metersPerLon, dz=(lat-S.center.lat)*S.metersPerLat;
+    const d=Math.hypot(dx,dz);
+    const dome=1500*Math.exp(-(d*d)/(2*900*900));      // central massif
+    const ridges=fbm(dx/650+13,dz/650+7)*1700;
+    return 1650+dome+ridges;
+  };
+}
+
+// ---------- terrain tiles (AWS Terrarium) ----------
+function lonLatToGlobalPx(lon,lat,z){
+  const n=2**z, x=(lon+180)/360*n;
+  const lr=lat*Math.PI/180;
+  const y=(1-Math.log(Math.tan(lr)+1/Math.cos(lr))/Math.PI)/2*n;
+  return {gx:x*256,gy:y*256};
+}
+async function buildElevation(){
+  // disc bbox in lat/lon — fetch for the MAX padding so the slider always has data
+  const fetchR=Math.max(S.trackMaxD*3.2,400);
+  const dLat=fetchR/S.metersPerLat, dLon=fetchR/S.metersPerLon;
+  const latMin=S.center.lat-dLat,latMax=S.center.lat+dLat;
+  const lonMin=S.center.lon-dLon,lonMax=S.center.lon+dLon;
+  // choose zoom so tile count stays modest
+  let z=14;
+  const tileSpan=()=>{
+    const a=lonLatToGlobalPx(lonMin,latMax,z),b=lonLatToGlobalPx(lonMax,latMin,z);
+    const txmin=Math.floor(a.gx/256),txmax=Math.floor(b.gx/256);
+    const tymin=Math.floor(a.gy/256),tymax=Math.floor(b.gy/256);
+    return{txmin,txmax,tymin,tymax,count:(txmax-txmin+1)*(tymax-tymin+1)};
+  };
+  let span=tileSpan();
+  while(z>8&&span.count>20){z--;span=tileSpan();}
+
+  const tiles=new Map();
+  const load=(tx,ty)=>new Promise(res=>{
+    const img=new Image();img.crossOrigin='anonymous';
+    img.onload=()=>{
+      try{const cv=document.createElement('canvas');cv.width=cv.height=256;
+        const ctx=cv.getContext('2d');ctx.drawImage(img,0,0);
+        tiles.set(tx+'_'+ty,ctx.getImageData(0,0,256,256).data);res(true);}
+      catch(err){res(false);}              // tainted canvas → CORS blocked
+    };
+    img.onerror=()=>res(false);
+    img.src=`https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${tx}/${ty}.png`;
+  });
+
+  const jobs=[];
+  for(let tx=span.txmin;tx<=span.txmax;tx++)
+    for(let ty=span.tymin;ty<=span.tymax;ty++)jobs.push(load(tx,ty));
+  let ok=false;
+  try{ok=(await Promise.all(jobs)).every(Boolean)&&tiles.size>0;}catch(e){ok=false;}
+
+  if(!ok){S.terrainSource='synthetic';S.sampleElev=makeSynth();return;}
+
+  S.terrainSource='real';
+  const txmin=span.txmin,tymin=span.tymin,txmax=span.txmax,tymax=span.tymax;
+  const pxAt=(gx,gy)=>{
+    let tx=clamp(Math.floor(gx/256),txmin,txmax),ty=clamp(Math.floor(gy/256),tymin,tymax);
+    const d=tiles.get(tx+'_'+ty);if(!d)return 0;
+    const lx=clamp(Math.floor(gx)-tx*256,0,255),ly=clamp(Math.floor(gy)-ty*256,0,255);
+    const i=(ly*256+lx)*4;
+    return d[i]*256+d[i+1]+d[i+2]/256-32768;
+  };
+  S.sampleElev=(lat,lon)=>{
+    const {gx,gy}=lonLatToGlobalPx(lon,lat,z);
+    const x0=Math.floor(gx),y0=Math.floor(gy),fx=gx-x0,fy=gy-y0;
+    return lerp(lerp(pxAt(x0,y0),pxAt(x0+1,y0),fx),
+                lerp(pxAt(x0,y0+1),pxAt(x0+1,y0+1),fx),fy);
+  };
+}
+
+// ---------- ingest a track ----------
+async function ingest(track){
+  S.track=track;
+  let latMin=1e9,latMax=-1e9,lonMin=1e9,lonMax=-1e9;
+  for(const p of track){latMin=Math.min(latMin,p.lat);latMax=Math.max(latMax,p.lat);
+    lonMin=Math.min(lonMin,p.lon);lonMax=Math.max(lonMax,p.lon);}
+  S.center={lat:(latMin+latMax)/2,lon:(lonMin+lonMax)/2};
+  S.metersPerLat=111320;S.metersPerLon=111320*Math.cos(S.center.lat*Math.PI/180);
+  // track extent (m) from centre
+  let maxD=0;
+  for(const p of track){const dx=(p.lon-S.center.lon)*S.metersPerLon,dz=(p.lat-S.center.lat)*S.metersPerLat;
+    maxD=Math.max(maxD,Math.hypot(dx,dz));}
+  S.trackMaxD=Math.max(maxD,1);
+  S.R=Math.max(S.trackMaxD*S.pad,350);
+
+  setStatus('loading','Fetching elevation…');
+  await buildElevation();
+  setStatus(S.terrainSource==='real'?'real':'synth',
+    S.terrainSource==='real'?'Real terrain · AWS DEM':'Synthetic terrain (offline)');
+
+  buildModel(true);
+  computeStats();
+}
+
+// ---------- build dispatcher ----------
+function detailToGrid(){
+  const NS=Math.round(48+S.detail*40);            // angular segments
+  return {NS,NR:Math.round(NS*0.5)};
+}
+function buildModel(reframe){
+  S.R=Math.max((S.trackMaxD||S.R)*S.pad,350);
+  if(terrainMesh){scene.remove(terrainMesh);terrainMesh.geometry.dispose();
+    terrainMesh.material.dispose();terrainMesh=null;}
+  if(S.style==='voxel')buildVoxel(); else buildRadial();
+  recolour();buildTrail();updateLights();
+  if(reframe)frameCamera();
+  updateScale();
+}
+
+// ---------- realistic / low-poly: radial core ----------
+function buildRadial(){
+  const {NS,NR}=detailToGrid();
+  const ringElev=[];let minE=1e9,maxE=-1e9;
+  const centerE=S.sampleElev(S.center.lat,S.center.lon);
+  minE=Math.min(minE,centerE);maxE=Math.max(maxE,centerE);
+  for(let i=1;i<=NR;i++){
+    const r=S.R*i/NR,row=[];
+    for(let j=0;j<NS;j++){
+      const th=j/NS*Math.PI*2,x=r*Math.cos(th),z=r*Math.sin(th);
+      const lat=S.center.lat+(-z)/S.metersPerLat,lon=S.center.lon+x/S.metersPerLon;
+      const e=S.sampleElev(lat,lon);row.push(e);
+      if(e<minE)minE=e;if(e>maxE)maxE=e;
+    }
+    ringElev.push(row);
+  }
+  S.minElev=minE;S.maxElev=maxE;S.elevSpan=Math.max(maxE-minE,1);
+  const exag=S.exag,yOf=e=>(e-minE)*exag,baseY=-S.ped*S.R;
+
+  const topCount=1+NR*NS, total=topCount+NS+NS+1;
+  const pos=new Float32Array(total*3);
+  const vElev=new Float32Array(total),vSlope=new Float32Array(total),
+        vShade=new Float32Array(total),vKind=new Uint8Array(total);
+  const idxTop=(i,j)=>1+(i-1)*NS+((j%NS+NS)%NS);
+
+  pos[1]=yOf(centerE);vElev[0]=centerE;vShade[0]=1;
+  for(let i=1;i<=NR;i++){const r=S.R*i/NR;
+    for(let j=0;j<NS;j++){const th=j/NS*Math.PI*2,e=ringElev[i-1][j],vi=idxTop(i,j);
+      pos[vi*3]=r*Math.cos(th);pos[vi*3+1]=yOf(e);pos[vi*3+2]=r*Math.sin(th);
+      vElev[vi]=e;vShade[vi]=1;}}
+  const wt0=topCount,wb0=topCount+NS,bc=topCount+2*NS;
+  for(let j=0;j<NS;j++){const th=j/NS*Math.PI*2,x=S.R*Math.cos(th),z=S.R*Math.sin(th),e=ringElev[NR-1][j];
+    pos[(wt0+j)*3]=x;pos[(wt0+j)*3+1]=yOf(e);pos[(wt0+j)*3+2]=z;
+    pos[(wb0+j)*3]=x;pos[(wb0+j)*3+1]=baseY;pos[(wb0+j)*3+2]=z;
+    vElev[wt0+j]=e;vShade[wt0+j]=0.7;                 // wall top: ramp, darkened
+    vKind[wb0+j]=1;vShade[wb0+j]=0.55;}               // wall bottom: strata
+  pos[bc*3+1]=baseY;vKind[bc]=1;vShade[bc]=0.4;
+
+  const idx=[];
+  for(let j=0;j<NS;j++)idx.push(0,idxTop(1,j+1),idxTop(1,j));
+  for(let i=1;i<NR;i++)for(let j=0;j<NS;j++){
+    const a=idxTop(i,j),b=idxTop(i,j+1),c=idxTop(i+1,j+1),d=idxTop(i+1,j);
+    idx.push(a,b,d, b,c,d);}
+  for(let j=0;j<NS;j++){const a=wt0+j,b=wt0+((j+1)%NS),c=wb0+((j+1)%NS),d=wb0+j;
+    idx.push(a,d,b, b,d,c);}
+  for(let j=0;j<NS;j++)idx.push(bc,wb0+((j+1)%NS),wb0+j);
+
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.setIndex(idx);geo.computeVertexNormals();
+  const nrm=geo.attributes.normal.array;
+  for(let v=0;v<topCount;v++)vSlope[v]=clamp(1-nrm[v*3+1],0,1);
+  geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(total*3),3));
+
+  const mat=new THREE.MeshStandardMaterial({vertexColors:true,flatShading:!S.smooth,
+    roughness:0.95,metalness:0.0,side:THREE.DoubleSide});
+  terrainMesh=new THREE.Mesh(geo,mat);scene.add(terrainMesh);
+  S.model={geo,count:total,vElev,vSlope,vShade,vKind};
+}
+
+// ---------- voxel core ----------
+function buildVoxel(){
+  const ncell=Math.round(20+S.detail*12);            // 32..80 cells across
+  const cs=2*S.R/ncell, half=cs/2;
+  const E=[],inside=[];let minE=1e9,maxE=-1e9;
+  for(let i=0;i<ncell;i++){E[i]=[];inside[i]=[];
+    for(let j=0;j<ncell;j++){
+      const x=-S.R+(i+0.5)*cs,z=-S.R+(j+0.5)*cs,ins=Math.hypot(x,z)<=S.R;
+      inside[i][j]=ins;
+      if(!ins){E[i][j]=0;continue;}
+      const lat=S.center.lat+(-z)/S.metersPerLat,lon=S.center.lon+x/S.metersPerLon;
+      const e=S.sampleElev(lat,lon);E[i][j]=e;
+      if(e<minE)minE=e;if(e>maxE)maxE=e;
+    }}
+  if(minE>maxE){minE=0;maxE=1;}
+  S.minElev=minE;S.maxElev=maxE;S.elevSpan=Math.max(maxE-minE,1);
+  const exag=S.exag,vstep=cs,baseY=-S.ped*S.R;
+  const H=[];
+  for(let i=0;i<ncell;i++){H[i]=[];
+    for(let j=0;j<ncell;j++)
+      H[i][j]=inside[i][j]?Math.max(Math.round((E[i][j]-minE)*exag/vstep),1)*vstep:null;}
+
+  const P=[],vElev=[],vShade=[],vKind=[];
+  const pushV=(x,y,z,e,sh,k)=>{P.push(x,y,z);vElev.push(e);vShade.push(sh);vKind.push(k);};
+  const quad=(c,e,sh,k)=>{ // c=[v0,v1,v2,v3] → two triangles
+    const o=[0,1,2,0,2,3];
+    for(const ix of o)pushV(c[ix][0],c[ix][1],c[ix][2],e,sh,k);
+  };
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+  for(let i=0;i<ncell;i++)for(let j=0;j<ncell;j++){
+    if(!inside[i][j])continue;
+    const x=-S.R+(i+0.5)*cs,z=-S.R+(j+0.5)*cs,h=H[i][j],e=E[i][j];
+    const x0=x-half,x1=x+half,z0=z-half,z1=z+half;
+    quad([[x0,h,z0],[x1,h,z0],[x1,h,z1],[x0,h,z1]],e,1.0,0);          // top
+    quad([[x0,baseY,z0],[x0,baseY,z1],[x1,baseY,z1],[x1,baseY,z0]],e,0.45,1); // bottom
+    for(const d of dirs){
+      const ni=i+d[0],nj=j+d[1];
+      const out=ni<0||nj<0||ni>=ncell||nj>=ncell||!inside[ni][nj];
+      let yb;
+      if(out)yb=baseY; else{const nh=H[ni][nj];if(h<=nh)continue;yb=nh;}
+      let c;
+      if(d[0]===1)c=[[x1,yb,z0],[x1,yb,z1],[x1,h,z1],[x1,h,z0]];
+      else if(d[0]===-1)c=[[x0,yb,z1],[x0,yb,z0],[x0,h,z0],[x0,h,z1]];
+      else if(d[1]===1)c=[[x1,yb,z1],[x0,yb,z1],[x0,h,z1],[x1,h,z1]];
+      else c=[[x0,yb,z0],[x1,yb,z0],[x1,h,z0],[x0,h,z0]];
+      quad(c,e,out?0.82:0.7,0);                                       // side / step
+    }
+  }
+  const pos=new Float32Array(P),total=pos.length/3;
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  geo.computeVertexNormals();
+  geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(total*3),3));
+  const mat=new THREE.MeshStandardMaterial({vertexColors:true,flatShading:true,
+    roughness:0.95,metalness:0.0,side:THREE.DoubleSide});
+  terrainMesh=new THREE.Mesh(geo,mat);scene.add(terrainMesh);
+  S.model={geo,count:total,
+    vElev:Float32Array.from(vElev),vSlope:new Float32Array(total),
+    vShade:Float32Array.from(vShade),vKind:Uint8Array.from(vKind)};
+}
+
+// ---------- colour (unified across styles) ----------
+function sampleRamp(t){
+  const s=[...S.rampStops].sort((a,b)=>a.p-b.p);
+  if(t<=s[0].p)return hexToRgb(s[0].c);
+  if(t>=s[s.length-1].p)return hexToRgb(s[s.length-1].c);
+  for(let i=0;i<s.length-1;i++)if(t>=s[i].p&&t<=s[i+1].p){
+    const f=(t-s[i].p)/((s[i+1].p-s[i].p)||1),a=hexToRgb(s[i].c),b=hexToRgb(s[i+1].c);
+    return {r:lerp(a.r,b.r,f),g:lerp(a.g,b.g,f),b:lerp(a.b,b.b,f)};
+  }
+  return hexToRgb(s[0].c);
+}
+function recolour(){
+  if(!S.model)return;
+  const m=S.model,col=m.geo.attributes.color.array,n=m.count;
+  const snowE=S.minElev+S.snow*S.elevSpan, band=S.elevSpan*0.04+1;
+  const white={r:0.93,g:0.96,b:0.97}, base=hexToRgb(S.baseColor);
+  for(let v=0;v<n;v++){
+    let r,g,b;
+    if(m.vKind[v]===1){r=base.r;g=base.g;b=base.b;}
+    else{
+      const e=m.vElev[v],sl=m.vSlope[v];
+      const t=clamp((e-S.minElev)/S.elevSpan,0,1);
+      const c=sampleRamp(t);
+      let snow=smoothstep(snowE-band,snowE+band,e)*S.snowBlend;
+      if(sl>S.snowSlope)snow*=clamp(1-(sl-S.snowSlope)/0.25,0,1);
+      r=lerp(c.r,white.r,snow);g=lerp(c.g,white.g,snow);b=lerp(c.b,white.b,snow);
+      const sh=1-sl*S.slopeShade;r*=sh;g*=sh;b*=sh;
+      if(S.style==='contour'){
+        const cf=(e-S.minElev)/(S.elevSpan/S.contourCount);
+        const k=Math.round(cf),dd=Math.abs(cf-k),major=(k%5===0);
+        const line=1-smoothstep(0,major?0.14:0.08,dd),amt=line*(major?0.85:0.55);
+        r=lerp(r,r*0.3,amt);g=lerp(g,g*0.3,amt);b=lerp(b,b*0.3,amt);
+      }
+    }
+    const f=m.vShade[v];
+    col[v*3]=r*f;col[v*3+1]=g*f;col[v*3+2]=b*f;
+  }
+  m.geo.attributes.color.needsUpdate=true;
+}
+
+// ---------- trail ----------
+function buildTrail(){
+  while(trailGroup.children.length){const c=trailGroup.children.pop();
+    c.geometry&&c.geometry.dispose();c.material&&c.material.dispose();}
+  if(!S.trail||!S.track.length)return;
+  const exag=S.exag,off=S.R*0.0025*S.trailW;
+  const v=[];
+  for(const p of S.track){
+    const x=(p.lon-S.center.lon)*S.metersPerLon, z=-(p.lat-S.center.lat)*S.metersPerLat;
+    if(Math.hypot(x,z)>S.R*1.02)continue;
+    const e=S.sampleElev(p.lat,p.lon);
+    v.push(new THREE.Vector3(x,(e-S.minElev)*exag+off,z));
+  }
+  if(v.length<2)return;
+  const curve=new THREE.CatmullRomCurve3(v);
+  const tube=new THREE.TubeGeometry(curve,Math.min(v.length*3,1200),S.R*0.0016*S.trailW,8,false);
+  const mat=new THREE.MeshBasicMaterial({color:S.trailColor});
+  trailGroup.add(new THREE.Mesh(tube,mat));
+  if(S.markers){
+    const mk=r=>new THREE.SphereGeometry(S.R*0.004*S.trailW+S.R*0.004,16,16);
+    const a=new THREE.Mesh(mk(),new THREE.MeshBasicMaterial({color:S.trailColor}));
+    a.position.copy(v[0]);trailGroup.add(a);
+    const b=new THREE.Mesh(mk(),new THREE.MeshBasicMaterial({color:0xffffff}));
+    b.position.copy(v[v.length-1]);trailGroup.add(b);
+  }
+}
+
+// ---------- lights ----------
+function updateLights(){
+  sun.intensity=S.sunInt;hemi.intensity=S.amb;
+  const az=S.az*Math.PI/180, el=S.el*Math.PI/180, d=S.R*2;
+  sun.position.set(Math.cos(az)*Math.cos(el)*d, Math.sin(el)*d, Math.sin(az)*Math.cos(el)*d);
+}
+
+// ---------- stats ----------
+function computeStats(){
+  let dist=0,gain=0,lo=1e9,hi=-1e9,prev=null,prevE=null;
+  for(const p of S.track){
+    if(prev)dist+=haversine(prev,p);prev=p;
+    if(p.ele!=null){if(prevE!=null&&p.ele>prevE)gain+=p.ele-prevE;prevE=p.ele;
+      lo=Math.min(lo,p.ele);hi=Math.max(hi,p.ele);}
+  }
+  const km=dist/1000;
+  document.getElementById('stDist').textContent=km<10?km.toFixed(1)+' km':Math.round(km)+' km';
+  document.getElementById('stGain').textContent=isFinite(gain)?Math.round(gain)+' m':'—';
+  document.getElementById('stRange').textContent=
+    isFinite(lo)?Math.round(lo)+' / '+Math.round(hi)+' m':Math.round(S.minElev)+' / '+Math.round(S.maxElev)+' m';
+  document.getElementById('stRadius').textContent=(S.R/1000).toFixed(2)+' km';
+}
+
+// ---------- altitude scale ----------
+function updateScale(){
+  const stops=[...S.rampStops].sort((a,b)=>a.p-b.p);
+  const snowFrac=S.snow;
+  let g='linear-gradient(to top';
+  for(const s of stops)g+=`, ${s.c} ${(s.p*snowFrac*100).toFixed(1)}%`;
+  g+=`, #eef3f5 ${(snowFrac*100).toFixed(1)}%, #eef3f5 100%)`;
+  const grad=document.getElementById('scaleGrad');if(grad)grad.style.background=g;
+  const h=document.getElementById('snowHandle');if(h)h.style.bottom=(snowFrac*100)+'%';
+  const ticks=document.getElementById('scaleTicks');
+  if(ticks){ticks.innerHTML='';
+    for(let k=0;k<=4;k++){const f=k/4,el=document.createElement('span');
+      el.className='mono';el.style.bottom=(f*100)+'%';
+      el.textContent=Math.round(S.minElev+f*S.elevSpan)+' m';ticks.appendChild(el);}}
+  const sv=document.getElementById('snowVal');
+  if(sv)sv.textContent=Math.round(S.minElev+S.snow*S.elevSpan)+' m';
+}
+
+// ---------- export ----------
+function savePNG(){
+  renderer.render(scene,camera);
+  const a=document.createElement('a');
+  a.download='terrain-core.png';a.href=renderer.domElement.toDataURL('image/png');a.click();
+}
+
+// ---------- status badge ----------
+function setStatus(cls,text){
+  const s=document.getElementById('status');s.className=cls==='real'?'real':cls==='synth'?'synth':'';
+  document.getElementById('statusText').textContent=text;
+}
+
+// ============================================================
+//  UI WIRING
+// ============================================================
+let rebuildTimer=null;
+const scheduleRebuild=()=>{clearTimeout(rebuildTimer);rebuildTimer=setTimeout(()=>buildModel(false),120);};
+const $=id=>document.getElementById(id);
+const setVal=(id,txt)=>{const e=$(id);if(e)e.textContent=txt;};
+
+function wire(){
+  S.detail=defaultDetail(S.style);
+  $('detail').value=S.detail;setVal('detailVal',S.detail);
+  // source
+  $('gpxFile').onchange=e=>{const f=e.target.files[0];if(!f)return;
+    const rd=new FileReader();
+    rd.onload=async()=>{try{await ingest(parseGPX(rd.result));$('srcHint').textContent=f.name;}
+      catch(err){$('srcHint').textContent=err.message;setStatus('synth',err.message);}};
+    rd.readAsText(f);};
+  $('demoBtn').onclick=()=>ingest(demoTrack());
+
+  // style segmented
+  document.querySelectorAll('#styleSeg button').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#styleSeg button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');S.style=b.dataset.style;
+    S.smooth=(S.style==='realistic'||S.style==='contour');S.detail=defaultDetail(S.style);
+    $('smoothSw').classList.toggle('on',S.smooth);
+    $('detail').value=S.detail;setVal('detailVal',S.detail);
+    scheduleRebuild();
+  });
+  // toggles
+  const tog=(id,key,after)=>{const sw=$(id);sw.onclick=()=>{S[key]=!S[key];
+    sw.classList.toggle('on',S[key]);after&&after();};};
+  tog('smoothSw','smooth',()=>{if(terrainMesh){terrainMesh.material.flatShading=!S.smooth;
+    terrainMesh.material.needsUpdate=true;}});
+  tog('trailSw','trail',buildTrail);
+  tog('markerSw','markers',buildTrail);
+  tog('rotSw','autorotate');
+
+  // ranges → rebuild
+  const rb=(id,key,fmt,scale)=>{const el=$(id);el.oninput=()=>{
+    S[key]=scale?el.value*scale:+el.value;setVal(id+'Val',fmt(el.value));scheduleRebuild();};};
+  rb('detail','detail',v=>v);
+  rb('exag','exag',v=>(+v).toFixed(1)+'×');
+  rb('pad','pad',v=>v+'%',0.01);
+  rb('ped','ped',v=>v+'%',0.01);
+
+  // colour-only ranges (cheap)
+  const rc=(id,key,fmt,scale)=>{const el=$(id);el.oninput=()=>{
+    S[key]=scale?el.value*scale:+el.value;setVal(id+'Val',fmt(el.value));recolour();updateScale();};};
+  rc('slope','slopeShade',v=>v+'%',0.01);
+  rc('snow','snow',v=>'',0.01);
+  rc('snowBlend','snowBlend',v=>v+'%',0.01);
+  rc('snowSlope','snowSlope',v=>v+'%',0.01);
+  $('contour').oninput=e=>{S.contourCount=+e.target.value;setVal('contourVal',e.target.value);recolour();};
+  $('baseColor').oninput=e=>{S.baseColor=e.target.value;recolour();};
+  $('bgColor').oninput=e=>{S.bg=e.target.value;scene.background=new THREE.Color(S.bg);
+    scene.fog.color=new THREE.Color(S.bg);updateScale();};
+
+  // trail
+  $('trailColor').oninput=e=>{S.trailColor=e.target.value;buildTrail();};
+  $('trailW').oninput=e=>{S.trailW=+e.target.value;setVal('trailWVal',e.target.value);buildTrail();};
+
+  // light
+  const rl=(id,key,fmt,scale)=>{const el=$(id);el.oninput=()=>{
+    S[key]=scale?el.value*scale:+el.value;setVal(id+'Val',fmt(el.value));updateLights();};};
+  rl('az','az',v=>v+'°');
+  rl('el','el',v=>v+'°');
+  rl('int','sunInt',v=>v+'%',0.01);
+  rl('amb','amb',v=>v+'%',0.01);
+
+  // view
+  $('rot').oninput=e=>{S.rotSpeed=e.target.value*0.01;setVal('rotVal',e.target.value+'%');};
+  $('resetCam').onclick=frameCamera;
+  $('savePng').onclick=savePNG;
+
+  // ramp editor
+  renderStops();
+  $('addStop').onclick=()=>{S.rampStops.push({p:0.5,c:'#888888'});renderStops();recolour();updateScale();};
+
+  // snow handle drag on scale
+  const bar=$('scaleBar');
+  const setSnowFromY=cy=>{const r=bar.getBoundingClientRect();
+    S.snow=clamp(1-(cy-r.top)/r.height,0,1);$('snow').value=Math.round(S.snow*100);
+    recolour();updateScale();};
+  bar.addEventListener('pointerdown',e=>{setSnowFromY(e.clientY);
+    const mv=ev=>setSnowFromY(ev.clientY),up=()=>{removeEventListener('pointermove',mv);
+      removeEventListener('pointerup',up);};
+    addEventListener('pointermove',mv);addEventListener('pointerup',up);});
+
+  // mobile sheet
+  $('panelToggle').onclick=()=>$('panel').classList.toggle('open');
+  renderer.domElement.addEventListener('pointerdown',()=>{
+    const p=$('panel');if(p.classList.contains('open'))p.classList.remove('open');});
+}
+
+function renderStops(){
+  const box=$('stops');box.innerHTML='';
+  S.rampStops.forEach((s,i)=>{
+    const row=document.createElement('div');row.className='stop';
+    const col=document.createElement('input');col.type='color';col.value=s.c;
+    col.oninput=e=>{s.c=e.target.value;recolour();updateScale();};
+    const rng=document.createElement('input');rng.type='range';rng.min=0;rng.max=100;rng.value=Math.round(s.p*100);
+    rng.oninput=e=>{s.p=e.target.value*0.01;recolour();updateScale();};
+    const rm=document.createElement('button');rm.className='rm';rm.textContent='×';
+    rm.onclick=()=>{if(S.rampStops.length>2){S.rampStops.splice(i,1);renderStops();recolour();updateScale();}};
+    row.append(col,rng,rm);box.appendChild(row);
+  });
+}
+
+// ============================================================
+//  GO
+// ============================================================
+initThree();
+wire();
+ingest(demoTrack());   // show something immediately
+</script>
+</body>
+</html>

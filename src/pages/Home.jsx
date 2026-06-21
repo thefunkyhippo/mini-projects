@@ -15,26 +15,31 @@ export default function Home() {
         </div>
       ) : (
         <section className="grid">
-          {projects.map((p) => (
-          <Link
-            key={p.slug}
-            to={`/${p.slug}`}
-            className="card"
-            style={{ '--accent': p.accent }}
-          >
-            <div className="card-emoji" aria-hidden="true">
-              {p.emoji}
-            </div>
-            <div className="card-body">
-              <span className="card-tag">{p.tag}</span>
-              <h2 className="card-title">{p.title}</h2>
-              <p className="card-desc">{p.description}</p>
-            </div>
-            <span className="card-arrow" aria-hidden="true">
-              →
-            </span>
-            </Link>
-          ))}
+          {projects.map((p) => {
+            // ponytail: static-HTML entries use a plain <a>; React routes use <Link>
+            const Tag = p.href ? 'a' : Link
+            const linkProps = p.href ? { href: p.href } : { to: `/${p.slug}` }
+            return (
+              <Tag
+                key={p.slug}
+                {...linkProps}
+                className="card"
+                style={{ '--accent': p.accent }}
+              >
+                <div className="card-emoji" aria-hidden="true">
+                  {p.emoji}
+                </div>
+                <div className="card-body">
+                  <span className="card-tag">{p.tag}</span>
+                  <h2 className="card-title">{p.title}</h2>
+                  <p className="card-desc">{p.description}</p>
+                </div>
+                <span className="card-arrow" aria-hidden="true">
+                  →
+                </span>
+              </Tag>
+            )
+          })}
         </section>
       )}
     </div>

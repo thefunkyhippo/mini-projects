@@ -18,4 +18,13 @@ export const projects = [
     accent: '#7b46a0',
     component: lazy(() => import('./test-rpg/index.jsx')),
   },
+  {
+    slug: 'terrain-core',
+    title: 'Terrain Core',
+    description: 'Drop a GPX track and watch it rise as 3D relief.',
+    emoji: '🏔️',
+    tag: 'Toy',
+    accent: '#5fd0c8',
+    href: '/terrain-core.html', // static HTML in public/, opens as its own page
+  },
 ]
