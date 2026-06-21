@@ -291,6 +291,8 @@
           <div class="toggle">Auto-rotate <div class="sw on" id="rotSw"></div></div>
           <div class="row"><label>Rotate speed <span class="val" id="rotVal">30%</span></label>
             <input type="range" id="rot" min="0" max="100" step="1" value="30"></div>
+          <div class="row"><label>Haze <span class="val" id="fogVal">100%</span></label>
+            <input type="range" id="fog" min="0" max="300" step="5" value="100"></div>
           <div class="row"><button class="action" id="resetCam">Reset camera</button></div>
           <div class="row"><button class="action" id="savePng">Download PNG</button></div>
           <div class="hint">A full poster export (high-res, margins, title block) is the next milestone after voxel.</div>
@@ -336,7 +338,7 @@ const S={
     {p:0.00,c:'#3f6d4e'},{p:0.30,c:'#6f8f4f'},{p:0.55,c:'#b39b5e'},
     {p:0.75,c:'#8c6f52'},{p:0.92,c:'#6f6661'}
   ],
-  slopeShade:0.35, baseColor:'#4a4540', bg:'#0f1719', contourCount:24,
+  slopeShade:0.35, baseColor:'#4a4540', bg:'#0f1719', fog:0.00006, contourCount:24,
   snow:0.72, snowBlend:0.85, snowSlope:0.55,
   trail:true, markers:true, trailColor:'#ff7a4d', trailW:4,
   az:135, el:45, sunInt:1.1, amb:0.35,
@@ -369,7 +371,7 @@ function initThree(){
 
   scene=new THREE.Scene();
   scene.background=new THREE.Color(S.bg);
-  scene.fog=new THREE.FogExp2(S.bg,0.00006);
+  scene.fog=new THREE.FogExp2(S.bg,S.fog);
 
   camera=new THREE.PerspectiveCamera(42,innerWidth/innerHeight,1,200000);
 
@@ -945,6 +947,7 @@ function wire(){
 
   // view
   $('rot').oninput=e=>{S.rotSpeed=e.target.value*0.01;setVal('rotVal',e.target.value+'%');};
+  $('fog').oninput=e=>{scene.fog.density=(+e.target.value/100)*S.fog;setVal('fogVal',e.target.value+'%');};
   $('resetCam').onclick=frameCamera;
   $('savePng').onclick=savePNG;
 
