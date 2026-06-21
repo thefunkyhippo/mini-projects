@@ -82,9 +82,6 @@
   .vtrack{height:8px;background:var(--glass2);border-radius:5px;overflow:hidden;border:1px solid var(--line)}
   .vfill{height:100%;border-radius:5px;transition:width .5s cubic-bezier(.2,.7,.2,1), background .3s;box-shadow:0 0 10px currentColor}
   .vval{font-family:var(--mono);font-size:11.5px;text-align:right;color:var(--muted)}.note{font-size:11px;color:var(--muted2);margin-top:13px;line-height:1.45}
-  .split-bar{display:flex;height:36px;border-radius:9px;overflow:hidden;border:1px solid var(--line)}
-  .split-seg{display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:700;color:#06080c;transition:flex .5s cubic-bezier(.2,.7,.2,1)}
-  .split-key{display:flex;gap:15px;margin-top:11px;flex-wrap:wrap}.split-key .k{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}.split-key .dot{width:9px;height:9px;border-radius:3px;box-shadow:0 0 7px currentColor}
   .empty-stats{color:var(--muted2);font-size:13px;text-align:center;padding:12px 0}
   .sheet-bg{position:fixed;inset:0;background:rgba(4,6,10,.6);backdrop-filter:blur(5px);z-index:80;opacity:0;pointer-events:none;transition:opacity .28s}
   .sheet-bg.show{opacity:1;pointer-events:auto}
@@ -142,6 +139,18 @@
   .modal h2{font-family:var(--disp);font-weight:600;font-size:20px;margin-bottom:7px}.modal p{color:var(--muted);font-size:13.5px;margin-bottom:17px;line-height:1.5}
   .link-box{display:flex;gap:8px}.link-box input{flex:1;background:var(--glass);border:1px solid var(--line2);border-radius:10px;padding:11px 12px;color:var(--text);font-family:var(--mono);font-size:12px;min-width:0}
   .modal-close{margin-top:15px;width:100%;text-align:center;color:var(--muted2);font-size:13px;padding:7px}.modal-close:hover{color:var(--text)}
+  [data-mg]{cursor:pointer}
+  .region[data-mg]:hover{opacity:.82}
+  .vbar[data-mg]:hover .vn,.rlegend span[data-mg]:hover,.mx-row[data-mg]:hover .mx-name{color:var(--text)}
+  .mg-list{display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto;margin:4px 0}
+  .mg-ex{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--glass)}
+  .mg-ex-main{flex:1;min-width:0}
+  .mg-ex-name{font-size:13.5px;font-weight:600}
+  .mg-ex-sub{font-size:11.5px;color:var(--muted2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mg-ex-sub .sec{opacity:.75;font-style:italic}
+  .mg-ex-val{font-family:var(--mono);font-size:14px;font-weight:700;text-align:right;white-space:nowrap;color:var(--acc)}
+  .mg-ex-val span{display:block;font-size:9.5px;font-weight:500;color:var(--muted2)}
+  .mg-empty{color:var(--muted2);font-size:13px;padding:12px 0}
   #shareCard{position:fixed;left:-9999px;top:0;width:780px;background:var(--bg);padding:36px;font-family:var(--body);color:var(--text)}
   #shareCard .sc-head{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid var(--acc);padding-bottom:15px;margin-bottom:22px}
   #shareCard .sc-title{font-family:var(--disp);font-weight:700;font-size:34px;letter-spacing:-.02em}
@@ -235,6 +244,8 @@
   <p>This link carries the whole plan inside it — no account needed. Whoever opens it sees everything and can tweak it, which makes a new link of their own.</p>
   <div class="link-box"><input id="shareLink" readonly /><button class="btn primary" id="copyLink">Copy</button></div>
   <button class="modal-close" id="modalClose">Close</button></div></div>
+<div class="modal-bg" id="mgModalBg"><div class="modal"><div id="mgBody"></div>
+  <button class="modal-close" id="mgClose">Close</button></div></div>
 <script>
 const M={chest:'Chest',frontDelts:'Front Delts',sideDelts:'Side Delts',rearDelts:'Rear Delts',triceps:'Triceps',biceps:'Biceps',forearms:'Forearms',traps:'Traps',lats:'Lats',upperBack:'Upper Back',lowerBack:'Lower Back',abs:'Abs',glutes:'Glutes',quads:'Quads',hamstrings:'Hamstrings',calves:'Calves'};
 const PATTERN_COLOR={push:'var(--p-push)',pull:'var(--p-pull)',legs:'var(--p-legs)',core:'var(--p-core)'};
@@ -325,7 +336,6 @@ function seed(){plan.days=[
 function computeVolume(){const v={};Object.keys(M).forEach(k=>v[k]=0);
   plan.days.forEach(d=>d.ex.forEach(it=>{const r=resolveItem(it);r.p.forEach(m=>v[m]+=it.sets);r.s.forEach(m=>v[m]+=it.sets*0.5);}));return v;}
 function heatColor(v){if(v<=0)return'var(--c-empty)';if(v<6)return'var(--c-under)';if(v<10)return'var(--c-build)';if(v<19)return'var(--c-opt)';if(v<25)return'var(--c-high)';return'var(--c-vhigh)';}
-function splitTotals(){const t={push:0,pull:0,legs:0,core:0};plan.days.forEach(d=>d.ex.forEach(it=>t[MV[it.mid].pat]+=it.sets));return t;}
 const GROUP_COLOR={chest:'#5B9DFF',back:'#4FE6E0',shoulders:'#A77BFF',arms:'#FF8A5B',legs:'#35C76A',core:'#E8C13D'};
 const MGROUP={};GROUPS.forEach(g=>g.muscles.forEach(m=>MGROUP[m]=g.key));
 function groupVolume(){const v=computeVolume();const gv={};GROUPS.forEach(g=>gv[g.key]=0);Object.keys(v).forEach(m=>{gv[MGROUP[m]]+=v[m];});return gv;}
@@ -345,11 +355,11 @@ function renderAnalytics(){const el=$('#analytics');if(!el)return;const has=plan
   const totals=days.map((d,i)=>Object.values(dsets[i]).reduce((a,b)=>a+b,0));const maxT=Math.max(1,...totals);
   const dayHead=days.map(d=>`<div class="mx-d">${esc((d.name.trim()[0]||'?').toUpperCase())}</div>`).join('');
   const mxRows=GROUPS.map(g=>{const cells=days.map((d,i)=>`<div class="mx-cell ${dgr[i].has(g.key)?'on':''}" style="${dgr[i].has(g.key)?('--gc:'+GROUP_COLOR[g.key]):''}"></div>`).join('');
-    return `<div class="mx-row"><div class="mx-name">${g.name}</div><div class="mx-cells" style="grid-template-columns:repeat(${days.length},1fr)">${cells}</div><div class="mx-tag">${freq[g.key]}×</div></div>`;}).join('');
+    return `<div class="mx-row" data-mg="${g.key}"><div class="mx-name">${g.name}</div><div class="mx-cells" style="grid-template-columns:repeat(${days.length},1fr)">${cells}</div><div class="mx-tag">${freq[g.key]}×</div></div>`;}).join('');
   const card1=`<div class="card"><h3>Training frequency <span class="eyebrow">days / wk</span></h3><div class="mx"><div class="mx-row"><div class="mx-name"></div><div class="mx-cells" style="grid-template-columns:repeat(${days.length},1fr)">${dayHead}</div><div class="mx-tag"></div></div>${mxRows}</div></div>`;
-  const card2=`<div class="card"><h3>Muscle balance <span class="eyebrow">eff. sets</span></h3>${radarSVG(gv)}<div class="rlegend">${GROUPS.map(g=>`<span><i style="background:${GROUP_COLOR[g.key]}"></i>${g.name} ${fmt(gv[g.key])}</span>`).join('')}</div></div>`;
+  const card2=`<div class="card"><h3>Muscle balance <span class="eyebrow">eff. sets</span></h3>${radarSVG(gv)}<div class="rlegend">${GROUPS.map(g=>`<span data-mg="${g.key}"><i style="background:${GROUP_COLOR[g.key]}"></i>${g.name} ${fmt(gv[g.key])}</span>`).join('')}</div></div>`;
   const sdRows=days.map((d,i)=>{const segs=GROUPS.filter(g=>dsets[i][g.key]>0).map(g=>`<div class="sd-seg" style="flex:${dsets[i][g.key]};background:${GROUP_COLOR[g.key]}"></div>`).join('');return `<div class="sd-row"><div class="sd-name">${esc(d.name)}</div><div class="sd-track"><div class="sd-fill" style="width:${(totals[i]/maxT*100).toFixed(1)}%">${segs}</div></div><div class="sd-tot">${totals[i]}</div></div>`;}).join('');
-  const card3=`<div class="card"><h3>Sets per day <span class="eyebrow">by group</span></h3><div class="sd">${sdRows}</div><div class="rlegend">${GROUPS.map(g=>`<span><i style="background:${GROUP_COLOR[g.key]}"></i>${g.name}</span>`).join('')}</div></div>`;
+  const card3=`<div class="card"><h3>Sets per day <span class="eyebrow">by group</span></h3><div class="sd">${sdRows}</div><div class="rlegend">${GROUPS.map(g=>`<span data-mg="${g.key}"><i style="background:${GROUP_COLOR[g.key]}"></i>${g.name}</span>`).join('')}</div></div>`;
   el.innerHTML=`<div class="eyebrow">// analytics</div><div class="analytics-grid">${card1}${card2}${card3}</div>`;}
 function render(){$('#planTitle').value=plan.title;const wrap=$('#days');wrap.innerHTML='';
   plan.days.forEach(day=>{const totalSets=day.ex.reduce((a,e)=>a+e.sets,0);const el=document.createElement('div');el.className='day';
@@ -359,15 +369,13 @@ function render(){$('#planTitle').value=plan.title;const wrap=$('#days');wrap.in
 function exRow(dayId,it){const r=resolveItem(it);const musc=[...r.p,...r.s].map(m=>M[m]).join(', ');
   return `<div class="ex"><div class="ex-tag" style="color:${PATTERN_COLOR[r.pat]};background:${PATTERN_COLOR[r.pat]}"></div><div class="ex-main"><div class="ex-name">${esc(r.name)}<a href="${r.vid}" target="_blank" rel="noopener" title="How to perform"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/><path d="M10 9l5 3-5 3V9z" fill="currentColor"/></svg></a></div><div class="ex-muscles">${esc(musc)}</div></div><div class="sets"><button class="sets-ctrl" data-sets="-" data-day="${dayId}" data-ex="${it.uid}">–</button><div class="sets-val"><b>${it.sets}</b> sets</div><button class="sets-ctrl" data-sets="+" data-day="${dayId}" data-ex="${it.uid}">+</button></div><button class="icon-btn" data-del-ex="${it.uid}" data-day="${dayId}" title="Remove"><svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button></div>`;}
 function renderPanel(){const vol=computeVolume();const totalSets=plan.days.reduce((a,d)=>a+d.ex.reduce((b,e)=>b+e.sets,0),0);
-  const sessions=plan.days.length;const worked=Object.values(vol).filter(v=>v>0).length;const split=splitTotals();const splitTot=Math.max(1,split.push+split.pull+split.legs+split.core);
+  const sessions=plan.days.length;const worked=Object.values(vol).filter(v=>v>0).length;
   const ranked=Object.keys(M).map(k=>({k,name:M[k],v:vol[k]})).sort((a,b)=>b.v-a.v);const maxV=Math.max(10,...ranked.map(r=>r.v));
   $('#panel').innerHTML=`<div class="card"><h3>Plan overview</h3><div class="totals"><div class="stat"><div class="n">${sessions}</div><div class="l">Days / week</div></div><div class="stat"><div class="n">${totalSets}</div><div class="l">Total sets</div></div><div class="stat"><div class="n">${worked}<span style="font-size:15px;color:var(--muted2)">/16</span></div><div class="l">Muscles hit</div></div></div></div>
     <div class="card"><h3>Stimulus map <span class="eyebrow">scan</span></h3><div class="scanner"><span class="cnr tl"></span><span class="cnr tr"></span><span class="cnr bl"></span><span class="cnr br"></span><div class="scan-grid"></div><div class="scanline"></div><div class="map-wrap"><div class="map-col">${bodyFront(vol)}<div class="map-label">Anterior</div></div><div class="map-col">${bodyBack(vol)}<div class="map-label">Posterior</div></div></div></div><div class="legend"><span class="sw"><span class="dot" style="background:var(--c-under)"></span>Low</span><span class="sw"><span class="dot" style="background:var(--c-build)"></span>Building</span><span class="sw"><span class="dot" style="background:var(--c-opt)"></span>Solid 10–18</span><span class="sw"><span class="dot" style="background:var(--c-high)"></span>High</span><span class="sw"><span class="dot" style="background:var(--c-vhigh)"></span>Very high</span></div></div>
-    <div class="card"><h3>Weekly sets / muscle <span class="eyebrow">eff.</span></h3>${totalSets?`<div class="vbars">${ranked.map(r=>`<div class="vbar"><div class="vn">${r.name}</div><div class="vtrack"><div class="vfill" style="width:${Math.min(100,r.v/maxV*100)}%;color:${heatColor(r.v)};background:${heatColor(r.v)}"></div></div><div class="vval">${fmt(r.v)}</div></div>`).join('')}</div><p class="note">Secondary muscles count as half a set — the standard way to estimate effective volume.</p>`:`<div class="empty-stats">Add exercises to see volume.</div>`}</div>
-    <div class="card"><h3>Push · Pull · Legs balance</h3>${splitTot>1?`<div class="split-bar">${seg('push',split.push)}${seg('pull',split.pull)}${seg('legs',split.legs)}${seg('core',split.core)}</div><div class="split-key"><span class="k"><span class="dot" style="color:var(--p-push);background:var(--p-push)"></span>Push ${split.push}</span><span class="k"><span class="dot" style="color:var(--p-pull);background:var(--p-pull)"></span>Pull ${split.pull}</span><span class="k"><span class="dot" style="color:var(--p-legs);background:var(--p-legs)"></span>Legs ${split.legs}</span><span class="k"><span class="dot" style="color:var(--p-core);background:var(--p-core)"></span>Core ${split.core}</span></div>`:`<div class="empty-stats">Add exercises to see balance.</div>`}</div>`;}
-function seg(pat,v){if(v<=0)return'';return `<div class="split-seg" style="flex:${v};background:${PATTERN_COLOR[pat]}">${v}</div>`;}
+    <div class="card"><h3>Weekly sets / muscle <span class="eyebrow">eff.</span></h3>${totalSets?`<div class="vbars">${ranked.map(r=>`<div class="vbar" data-mg="${r.k}"><div class="vn">${r.name}</div><div class="vtrack"><div class="vfill" style="width:${Math.min(100,r.v/maxV*100)}%;color:${heatColor(r.v)};background:${heatColor(r.v)}"></div></div><div class="vval">${fmt(r.v)}</div></div>`).join('')}</div><p class="note">Secondary muscles count as half a set — the standard way to estimate effective volume.</p>`:`<div class="empty-stats">Add exercises to see volume.</div>`}</div>`;}
 function fmt(v){return Number.isInteger(v)?v:v.toFixed(1);}
-function rc(id,vol){return `class="region" fill="${heatColor(vol[id]||0)}"`;}
+function rc(id,vol){return `class="region" data-mg="${id}" fill="${heatColor(vol[id]||0)}"`;}
 function bodyFront(vol){return `<svg viewBox="0 0 170 380" aria-label="Front muscle map"><ellipse cx="85" cy="30" rx="20" ry="24" class="body-base"/><rect x="74" y="50" width="22" height="16" rx="6" class="body-base"/><ellipse cx="48" cy="78" rx="17" ry="15" ${rc('sideDelts',vol)}/><ellipse cx="122" cy="78" rx="17" ry="15" ${rc('sideDelts',vol)}/><ellipse cx="58" cy="84" rx="13" ry="12" ${rc('frontDelts',vol)}/><ellipse cx="112" cy="84" rx="13" ry="12" ${rc('frontDelts',vol)}/><path d="M62 78 H85 V112 Q73 120 60 110 Q56 92 62 78Z" ${rc('chest',vol)}/><path d="M108 78 H85 V112 Q97 120 110 110 Q114 92 108 78Z" ${rc('chest',vol)}/><rect x="34" y="96" width="18" height="44" rx="9" ${rc('biceps',vol)}/><rect x="118" y="96" width="18" height="44" rx="9" ${rc('biceps',vol)}/><rect x="30" y="142" width="16" height="46" rx="8" ${rc('forearms',vol)}/><rect x="124" y="142" width="16" height="46" rx="8" ${rc('forearms',vol)}/><rect x="68" y="118" width="34" height="56" rx="9" ${rc('abs',vol)}/><path d="M66 196 Q62 250 70 300 L82 300 Q84 250 83 196 Z" ${rc('quads',vol)}/><path d="M104 196 Q108 250 100 300 L88 300 Q86 250 87 196 Z" ${rc('quads',vol)}/><rect x="68" y="304" width="14" height="60" rx="7" class="body-base"/><rect x="88" y="304" width="14" height="60" rx="7" class="body-base"/></svg>`;}
 function bodyBack(vol){return `<svg viewBox="0 0 170 380" aria-label="Back muscle map"><ellipse cx="85" cy="30" rx="20" ry="24" class="body-base"/><path d="M66 54 H104 L96 86 H74 Z" ${rc('traps',vol)}/><ellipse cx="50" cy="80" rx="16" ry="14" ${rc('rearDelts',vol)}/><ellipse cx="120" cy="80" rx="16" ry="14" ${rc('rearDelts',vol)}/><rect x="64" y="86" width="42" height="24" rx="7" ${rc('upperBack',vol)}/><path d="M62 108 Q54 130 66 150 L84 146 V110 Z" ${rc('lats',vol)}/><path d="M108 108 Q116 130 104 150 L86 146 V110 Z" ${rc('lats',vol)}/><rect x="34" y="96" width="18" height="46" rx="9" ${rc('triceps',vol)}/><rect x="118" y="96" width="18" height="46" rx="9" ${rc('triceps',vol)}/><rect x="30" y="144" width="16" height="44" rx="8" class="body-base"/><rect x="124" y="144" width="16" height="44" rx="8" class="body-base"/><rect x="70" y="150" width="30" height="34" rx="8" ${rc('lowerBack',vol)}/><ellipse cx="76" cy="200" rx="15" ry="14" ${rc('glutes',vol)}/><ellipse cx="94" cy="200" rx="15" ry="14" ${rc('glutes',vol)}/><rect x="66" y="216" width="17" height="78" rx="8" ${rc('hamstrings',vol)}/><rect x="87" y="216" width="17" height="78" rx="8" ${rc('hamstrings',vol)}/><rect x="67" y="300" width="15" height="58" rx="7" ${rc('calves',vol)}/><rect x="88" y="300" width="15" height="58" rx="7" ${rc('calves',vol)}/></svg>`;}
 let pk={open:false,dayId:null,mode:'muscle',level:0,group:null,sub:null,q:'',cfgMid:null,cfgSel:{},cfgSets:3,justAdded:false,_t:null};
@@ -456,6 +464,30 @@ function buildShareCard(){const vol=computeVolume();const totalSets=plan.days.re
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function cap(s){return s.charAt(0).toUpperCase()+s.slice(1);}
 let toastT;function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),1900);}
+// ---- muscle/group breakdown: which exercises count toward a muscle group ----
+function showBreakdown(key){
+  const grp=GROUPS.find(g=>g.key===key);
+  const muscles=grp?grp.muscles:[key];const mset=new Set(muscles);
+  const title=grp?grp.name:(M[key]||key);
+  const rows=[];let total=0;
+  plan.days.forEach(d=>d.ex.forEach(it=>{
+    const r=resolveItem(it);
+    const pHit=r.p.filter(m=>mset.has(m)),sHit=r.s.filter(m=>mset.has(m));
+    if(!pHit.length&&!sHit.length)return;
+    const eff=it.sets*pHit.length+it.sets*0.5*sHit.length;total+=eff;
+    const tags=[...pHit.map(m=>`${M[m]}`),...sHit.map(m=>`<span class="sec">${M[m]} (2nd)</span>`)].join(', ');
+    rows.push({name:r.name,day:d.name,sets:it.sets,eff,tags});
+  }));
+  rows.sort((a,b)=>b.eff-a.eff);
+  const list=rows.length?`<div class="mg-list">${rows.map(r=>`<div class="mg-ex"><div class="mg-ex-main"><div class="mg-ex-name">${esc(r.name)}</div><div class="mg-ex-sub">${esc(r.day)} · ${r.sets} sets · ${r.tags}</div></div><div class="mg-ex-val">${fmt(r.eff)}<span>eff. sets</span></div></div>`).join('')}</div>`:`<div class="mg-empty">No exercises target ${esc(title)} yet.</div>`;
+  $('#mgBody').innerHTML=`<h2>${esc(title)}</h2><p>${rows.length} exercise${rows.length===1?'':'s'} · ${fmt(total)} effective sets / week</p>${list}`;
+  $('#mgModalBg').classList.add('show');
+}
+function closeBreakdown(){$('#mgModalBg').classList.remove('show');}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-mg]');if(t)showBreakdown(t.dataset.mg);});
+$('#mgClose').onclick=closeBreakdown;
+$('#mgModalBg').onclick=e=>{if(e.target===$('#mgModalBg'))closeBreakdown();};
+addEventListener('keydown',e=>{if(e.key==='Escape')closeBreakdown();});
 (function init(){$('#pickSearch').placeholder=`Search ${MV.length} movements…`;const h=location.hash.slice(1);if(h&&decodePlan(h)&&plan.days.length){}else seed();render();})();
 </script>
 </body>
