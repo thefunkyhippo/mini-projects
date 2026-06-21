@@ -10,15 +10,6 @@ import { lazy } from 'react'
 
 export const projects = [
   {
-    slug: 'test-rpg',
-    title: 'Test RPG',
-    description: 'A dark-fantasy top-down RPG with 16-bit pixel art and Pokémon-style grid movement.',
-    emoji: '🗡️',
-    tag: 'Game',
-    accent: '#7b46a0',
-    component: lazy(() => import('./test-rpg/index.jsx')),
-  },
-  {
     slug: 'terrain-core',
     title: 'Terrain Core',
     description: 'Drop a GPX track and watch it rise as 3D relief.',
