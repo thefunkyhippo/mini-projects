@@ -328,11 +328,7 @@ let plan={title:'My Workout Plan',days:[]};
 const $=s=>document.querySelector(s);
 const uid=()=>Math.random().toString(36).slice(2,8);
 function mk(key,sel,sets){return{uid:uid(),mid:MVKEY[key],sel:sel||{},sets};}
-function seed(){plan.days=[
- {id:uid(),name:'Push',ex:[mk('bench',{pos:'flat',imp:'bb'},4),mk('ohp',{pos:'stand',imp:'bb'},3),mk('bench',{pos:'incl',imp:'db'},3),mk('latraise',{pos:'stand',imp:'db'},4),mk('pushdown',{grip:'rope'},3)]},
- {id:uid(),name:'Pull',ex:[mk('pullup',{grip:'pull',load:'bw'},4),mk('row',{support:'bent',imp:'bb'},4),mk('row',{support:'seat',imp:'ca'},3),mk('facepull',{},3),mk('curl',{pos:'stand',imp:'bb',grip:'sup'},3)]},
- {id:uid(),name:'Legs',ex:[mk('squat',{variant:'back',imp:'bb'},4),mk('rdl',{variant:'std',imp:'bb'},3),mk('legpress',{variant:'std'},3),mk('legcurl',{pos:'lying'},3),mk('calf',{variant:'stand',imp:'ma'},4)]},
-];}
+function seed(){plan.days=[{id:uid(),name:'Day 1',ex:[]}];}  // blank start, no preloaded program
 function computeVolume(){const v={};Object.keys(M).forEach(k=>v[k]=0);
   plan.days.forEach(d=>d.ex.forEach(it=>{const r=resolveItem(it);r.p.forEach(m=>v[m]+=it.sets);r.s.forEach(m=>v[m]+=it.sets*0.5);}));return v;}
 function heatColor(v){if(v<=0)return'var(--c-empty)';if(v<6)return'var(--c-under)';if(v<10)return'var(--c-build)';if(v<19)return'var(--c-opt)';if(v<25)return'var(--c-high)';return'var(--c-vhigh)';}
@@ -488,7 +484,10 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-mg]');if(t
 $('#mgClose').onclick=closeBreakdown;
 $('#mgModalBg').onclick=e=>{if(e.target===$('#mgModalBg'))closeBreakdown();};
 addEventListener('keydown',e=>{if(e.key==='Escape')closeBreakdown();});
-(function init(){$('#pickSearch').placeholder=`Search ${MV.length} movements…`;const h=location.hash.slice(1);if(h&&decodePlan(h)&&plan.days.length){}else seed();render();})();
+(function init(){$('#pickSearch').placeholder=`Search ${MV.length} movements…`;const h=location.hash.slice(1);
+  if(h){if(!(decodePlan(h)&&plan.days.length)){seed();setTimeout(()=>toast('Couldn’t load that shared plan — starting fresh'),400);}}
+  else seed();
+  render();})();
 </script>
 </body>
 </html>
