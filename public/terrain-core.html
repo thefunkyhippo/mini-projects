@@ -462,21 +462,60 @@ function parseGPX(text){
   return pts;
 }
 
-// ---------- demo hike (near the Matterhorn) ----------
-function demoTrack(){
-  const c={lat:45.9763,lon:7.6586}, pts=[];
-  const N=160;
+// ---------- demo hike (switchback spiral; defaults = original Matterhorn) ----------
+function demoTrack(c={lat:45.9763,lon:7.6586}, o={}){
+  const N=o.N||160, turns=o.turns||2.6, baseR=o.baseR||1100,
+        wobAmp=o.wobAmp||120, baseEle=o.baseEle||2050, gain=o.gain||1320, pts=[];
   for(let i=0;i<N;i++){
     const u=i/(N-1);
-    const ang=u*Math.PI*5.2;                       // switchback spiral
-    const rad=(1-u)*1100+90;                       // metres from peak
-    const wob=Math.sin(ang*1.7)*120;
+    const ang=u*Math.PI*2*turns;                   // switchback spiral
+    const rad=(1-u)*baseR+90;                       // metres from peak
+    const wob=Math.sin(ang*1.7)*wobAmp;
     const dx=Math.cos(ang)*(rad+wob), dz=Math.sin(ang)*rad;
     const lat=c.lat+(-dz)/111320;
     const lon=c.lon+dx/(111320*Math.cos(c.lat*Math.PI/180));
-    pts.push({lat,lon,ele:2050+u*1320+Math.sin(ang*2)*40});
+    pts.push({lat,lon,ele:baseEle+u*gain+Math.sin(ang*2)*40});
   }
   return pts;
+}
+
+// ---------- randomized demo: new place, shape, and look each press ----------
+const rnd=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const DEMO_SPOTS=[                                  // scenic peaks so real-DEM mode lands on relief
+  {lat:45.9763,lon:7.6586}, {lat:46.5475,lon:7.9622}, {lat:27.9881,lon:86.9250},
+  {lat:46.0207,lon:7.7491}, {lat:44.4280,lon:6.4900}, {lat:36.5786,lon:-118.2920},
+  {lat:46.8523,lon:-121.7603}, {lat:35.3606,lon:138.7274},
+];
+const PALETTES=[
+  [{p:0,c:'#3f6d4e'},{p:.3,c:'#6f8f4f'},{p:.55,c:'#b39b5e'},{p:.75,c:'#8c6f52'},{p:.92,c:'#6f6661'}], // alpine
+  [{p:0,c:'#2a4d6e'},{p:.35,c:'#4a7fa0'},{p:.6,c:'#9bb7c4'},{p:.8,c:'#cdd9de'},{p:.95,c:'#ffffff'}],   // glacier
+  [{p:0,c:'#6b4f2a'},{p:.35,c:'#a9783f'},{p:.6,c:'#caa15c'},{p:.8,c:'#e3c98a'},{p:.95,c:'#f3e4c0'}],   // desert
+  [{p:0,c:'#2b2b2f'},{p:.4,c:'#5a3f3a'},{p:.65,c:'#8a4b3a'},{p:.85,c:'#c2603a'},{p:.96,c:'#f0a35a'}],  // volcanic
+  [{p:0,c:'#26433a'},{p:.35,c:'#3f7d5a'},{p:.6,c:'#8aa86a'},{p:.8,c:'#c2b878'},{p:.95,c:'#efe9cf'}],   // verdant
+];
+
+function loadRandomDemo(){
+  const s=pick(DEMO_SPOTS);
+  const c={lat:s.lat+rnd(-0.02,0.02), lon:s.lon+rnd(-0.02,0.02)};
+  const track=demoTrack(c,{N:Math.round(rnd(120,220)),turns:rnd(1.8,4.5),
+    baseR:rnd(700,1500),wobAmp:rnd(40,200),baseEle:rnd(1200,2600),gain:rnd(700,1800)});
+  // randomize render options and reflect them in the UI (rebuild happens in ingest)
+  applyStyle(pick(['realistic','contour','lowpoly','voxel']));
+  S.exag=+rnd(1.2,2.8).toFixed(1); $('exag').value=S.exag; setVal('exagVal',S.exag.toFixed(1)+'×');
+  S.snow=rnd(0.45,0.9);            $('snow').value=Math.round(S.snow*100);
+  S.az=Math.round(rnd(0,360));     $('az').value=S.az; setVal('azVal',S.az+'°');
+  S.rampStops=pick(PALETTES).map(p=>({...p})); renderStops();
+  ingest(track);
+}
+
+// sets style + dependent UI, without triggering a rebuild (callers decide when)
+function applyStyle(style){
+  document.querySelectorAll('#styleSeg button').forEach(x=>x.classList.toggle('on',x.dataset.style===style));
+  S.style=style;
+  S.smooth=(style==='realistic'||style==='contour');S.detail=defaultDetail(style);
+  $('smoothSw').classList.toggle('on',S.smooth);
+  $('detail').value=S.detail;setVal('detailVal',S.detail);
 }
 
 // ---------- synthetic terrain (offline fallback) ----------
@@ -850,21 +889,18 @@ function wire(){
   S.detail=defaultDetail(S.style);
   $('detail').value=S.detail;setVal('detailVal',S.detail);
   // source
-  $('gpxFile').onchange=e=>{const f=e.target.files[0];if(!f)return;
+  $('gpxFile').onchange=e=>{const f=e.target.files[0];
+    e.target.value='';                       // reset so re-picking any file fires change again
+    if(!f)return;
     const rd=new FileReader();
     rd.onload=async()=>{try{await ingest(parseGPX(rd.result));$('srcHint').textContent=f.name;}
       catch(err){$('srcHint').textContent=err.message;setStatus('synth',err.message);}};
     rd.readAsText(f);};
-  $('demoBtn').onclick=()=>ingest(demoTrack());
+  $('demoBtn').onclick=loadRandomDemo;
 
   // style segmented
   document.querySelectorAll('#styleSeg button').forEach(b=>b.onclick=()=>{
-    document.querySelectorAll('#styleSeg button').forEach(x=>x.classList.remove('on'));
-    b.classList.add('on');S.style=b.dataset.style;
-    S.smooth=(S.style==='realistic'||S.style==='contour');S.detail=defaultDetail(S.style);
-    $('smoothSw').classList.toggle('on',S.smooth);
-    $('detail').value=S.detail;setVal('detailVal',S.detail);
-    scheduleRebuild();
+    applyStyle(b.dataset.style);scheduleRebuild();
   });
   // toggles
   const tog=(id,key,after)=>{const sw=$(id);sw.onclick=()=>{S[key]=!S[key];
