@@ -27,4 +27,13 @@ export const projects = [
     accent: '#5fd0c8',
     href: '/terrain-core.html', // static HTML in public/, opens as its own page
   },
+  {
+    slug: 'workout-builder',
+    title: 'SPLIT',
+    description: 'Build a weekly workout split, exercise by exercise.',
+    emoji: '🏋️',
+    tag: 'Tool',
+    accent: '#f97316',
+    href: '/workout-builder.html',
+  },
 ]
